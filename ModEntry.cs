@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Xml.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using StardewModdingAPI;
@@ -12,10 +13,12 @@ using StardewValley.Inventories;
 using StardewValley.ItemTypeDefinitions;
 using StardewValley.Locations;
 using StardewValley.Menus;
+using StardewValley.Minigames;
 using StardewValley.Objects;
 using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 using xTile.Layers;
+using SObject = StardewValley.Object;
 
 namespace Instant_Community_Center_Cheat
 {
@@ -32,7 +35,6 @@ namespace Instant_Community_Center_Cheat
 
         private CommunityCenter? communityCenter;
         private CommunityCenter CommunityCenter => communityCenter ??= (CommunityCenter)Game1.getLocationFromName("CommunityCenter");
-
 
         /*********
         ** Public methods
@@ -71,15 +73,36 @@ namespace Instant_Community_Center_Cheat
             if (CommunityCenter != null)
             {
                 Log("Community center found");
-                int areasComplete = CommunityCenter.areasComplete.Count(a => a);
+                bool communityCenterComplete = CommunityCenter.areAllAreasComplete();
 
                 //If the community center isn't complete and the player doesn't have at least one bundle open,
                 //say the steps the player currently needs to do in order to get in unlocked
 
                 //Otherwise, if the community center isn't complete,
-                if (areasComplete < 6)
+                if (!communityCenterComplete)
                 {
-                    Log($"Community Center not complete. {areasComplete} area(s) completed");
+                    Log($"Community Center not complete");
+
+
+
+                    //Get all the bundles that are not complete
+                    
+                    List<BundleModel> incompleteBundles = GetBundles(this.Monitor).Where(b => !CommunityCenter.isBundleComplete(b.ID)).ToList();
+
+                    //In the list of incomplete bundles, check which items have been donated or not
+                    BundleModel incompleteBundle = incompleteBundles[0];
+
+                    BundleIngredientModel[] allIngredients = incompleteBundle.Ingredients;
+
+                    //get the slots needed for an bundle to be completed
+                    int bundleSlots = incompleteBundle.Slots;
+
+                    BundleIngredientModel[] requiredIngredients = allIngredients.Where(i => IsIngredientNeeded(incompleteBundle, i)).Take(bundleSlots).ToArray();
+                    Log($"Incoplete bundle name: {incompleteBundle.DisplayName}");
+
+                    Log($"Incoplete bundle required ingredients ids: {Join(requiredIngredients.Select(i => i.ItemId))}");
+
+                    return;
 
                     //get all of the items the player to complete the Comunity Center.
                     List<Item> missingItems = new List<Item>();
@@ -108,6 +131,7 @@ namespace Instant_Community_Center_Cheat
                     missingItems = missingItems.OrderByDescending(i => i.Stack).ToList();
 
                     Inventory playerItems = Game1.player.Items;
+
 
 
                     // For each item in that list:
@@ -180,6 +204,176 @@ namespace Instant_Community_Center_Cheat
         private void Log(string message, LogLevel level = LogLevel.Debug)
         {
             this.Monitor.Log(message, level);
+        }
+
+        private string Join<T>(IEnumerable<T> collection, string separator = ", ")
+        { 
+            return string.Join(separator, collection);
+        }
+
+        //The following code below was taken straight from Pathoschild's Look Up Anything mod
+
+        /// <summary>Read parsed data about the Community Center bundles.</summary>
+        /// <param name="monitor">The monitor with which to log errors.</param>
+        /// <remarks>Derived from the <see cref="StardewValley.Locations.CommunityCenter"/> constructor and <see cref="StardewValley.Menus.JunimoNoteMenu.openRewardsMenu"/>.</remarks>
+        private IEnumerable<BundleModel> GetBundles(IMonitor monitor)
+        {
+            foreach ((string key, string? value) in Game1.netWorldState.Value.BundleData)
+            {
+                if (value is null)
+                    continue;
+
+                BundleModel bundle;
+                try
+                {
+                    // parse key
+                    string[] keyParts = key.Split('/');
+                    string area = ArgUtility.Get(keyParts, 0);
+                    int id = ArgUtility.GetInt(keyParts, 1);
+
+                    // parse bundle info
+                    string[] valueParts = value.Split('/');
+                    string name = ArgUtility.Get(valueParts, Bundle.NameIndex);
+                    string reward = ArgUtility.Get(valueParts, Bundle.RewardIndex);
+                    string displayName = ArgUtility.Get(valueParts, Bundle.DisplayNameIndex);
+
+                    // parse ingredients
+                    List<BundleIngredientModel> ingredients = new List<BundleIngredientModel>();
+                    string[] ingredientData = ArgUtility.SplitBySpace(ArgUtility.Get(valueParts, 2));
+                    for (int i = 0; i < ingredientData.Length; i += 3)
+                    {
+                        int index = i / 3;
+                        string itemID = ArgUtility.Get(ingredientData, i);
+                        int stack = ArgUtility.GetInt(ingredientData, i + 1);
+                        ItemQuality quality = ArgUtility.GetEnum<ItemQuality>(ingredientData, i + 2);
+                        ingredients.Add(new BundleIngredientModel(index, itemID, stack, quality));
+                    }
+
+                    // create bundle
+                    bundle = new BundleModel(
+                        ID: id,
+                        Name: name,
+                        DisplayName: displayName,
+                        Area: area,
+                        RewardData: reward,
+                        Ingredients: ingredients.ToArray(),
+                        Slots: GetBundleSlotCount(id)
+                    );
+                }
+                catch (Exception ex)
+                {
+                    monitor.LogOnce($"Couldn't parse community center bundle '{key}' due to an invalid format.\nRecipe data: '{value}'\nError: {ex}", LogLevel.Warn);
+                    continue;
+                }
+
+                yield return bundle;
+            }
+        }
+
+        /// <summary>
+        /// Get the number of items slots needed in order to complete the bundle
+        /// </summary>
+        /// <param name="id">the unique id of the bundle</param>
+        /// <returns></returns>
+        private int GetBundleSlotCount(int id)
+        {
+            switch (id)
+            { 
+                case 0: //Spring Crops
+                    return 4;
+                case 1: // Summer Crops
+                    return 4;
+                case 2: //Fall Crops
+                    return 4;
+                case 3: //Quality Crops
+                case 4: //Animal
+                case 5: //Artisan
+                case 13: //Spring Foraging
+                    return 4;
+                case 14: //Summer Foraging
+                    return 3;
+                case 15: //Fall Foraging
+                    return 4;
+                case 16: //Winter Foraging
+                    return 4;
+                case 17: //Construction
+                    return 4;
+                case 19: //Exotic Foraging
+                    return 5;
+                case 6: //River Fish
+                    return 4;
+                case 7: //Lake Fish
+                    return 4;
+                case 8: //Ocean Fish
+                    return 4;
+                case 9: //Night Fishing
+                    return 3;
+                case 10: //Specialty Fish
+                    return 4;
+                case 11: //Crab Pot
+                    return 5;
+                case 20: //Blacksmith's
+                    return 3;
+                case 21: //Geologist's
+                    return 4;
+                case 22: //Adventurer's
+                    return 2;
+                case 31: //Chef's
+                    return 6;
+                case 32: //Field Research
+                    return 4;
+                case 33: //Enchanter's
+                    return 3;
+                case 34: //Dye
+                    return 6;
+                case 35: //Fodder
+                    return 3;
+                case 36: //The Missing
+                    return 5;
+            }
+            return int.MinValue;
+        }
+
+        /// <summary>Get whether an ingredient is still needed for a bundle.</summary>
+        /// <param name="bundle">The bundle to check.</param>
+        /// <param name="ingredient">The ingredient to check.</param>
+        private bool IsIngredientNeeded(BundleModel bundle, BundleIngredientModel ingredient)
+        {
+            CommunityCenter communityCenter = Game1.locations.OfType<CommunityCenter>().First();
+
+            // handle rare edge case where item is required in the bundle data, but it's not
+            // present in the community center data. This seems to be caused by some mods like
+            // Challenging Community Center Bundles in some cases.
+            if (!communityCenter.bundles.TryGetValue(bundle.ID, out bool[] items) || ingredient.Index >= items.Length)
+                return true;
+
+            return !items[ingredient.Index];
+        }
+
+        /// <summary>A bundle entry parsed from the game's data files.</summary>
+        /// <param name="ID">The unique bundle ID.</param>
+        /// <param name="Name">The bundle name.</param>
+        /// <param name="DisplayName">The translated bundle name.</param>
+        /// <param name="Area">The community center area containing the bundle.</param>
+        /// <param name="RewardData">The unparsed reward description, which can be parsed with <see cref="StardewValley.Utility.getItemFromStandardTextDescription"/>.</param>
+        /// <param name="Ingredients">The required item ingredients.</param>
+        /// <param name="Slots">The amount of items needed in order to complete the bundle</param>
+        internal record BundleModel(int ID, string Name, string DisplayName, string Area, string RewardData, BundleIngredientModel[] Ingredients, int Slots);
+
+
+        /// <summary>An item slot for a bundle.</summary>
+        /// <param name="Index">The ingredient's index in the bundle.</param>
+        /// <param name="ItemId">The required item's qualified or unqualified item ID, or category ID, or -1 for a monetary bundle.</param>
+        /// <param name="Stack">The number of items required.</param>
+        /// <param name="Quality">The required item quality.</param>
+        internal record BundleIngredientModel(int Index, string ItemId, int Stack, ItemQuality Quality);
+
+        internal enum ItemQuality
+        {
+            Normal = SObject.lowQuality,
+            Silver = SObject.medQuality,
+            Gold = SObject.highQuality,
+            Iridium = SObject.bestQuality
         }
     }
 }
