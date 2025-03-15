@@ -35,6 +35,11 @@ namespace Instant_Community_Center_Cheat
 
         private CommunityCenter? communityCenter;
         private CommunityCenter CommunityCenter => communityCenter ??= (CommunityCenter)Game1.getLocationFromName("CommunityCenter");
+        
+
+        //key is the area id in the CC
+        //the value is the list of ids corresponding the the bundles within that area
+        private Dictionary<int, int[]> areaBundles;
 
         /*********
         ** Public methods
@@ -43,6 +48,18 @@ namespace Instant_Community_Center_Cheat
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
+            //todo make this dynamic by reading from Bundles.json
+            areaBundles = new Dictionary<int, int[]>()
+            {
+                { CommunityCenter.AREA_Pantry, new int[]{ 0, 1, 2, 3, 4, 5  } },
+                { CommunityCenter.AREA_CraftsRoom, new int[] { 13, 14, 15, 16, 17, 19 } },
+                { CommunityCenter.AREA_FishTank, new int[] { 6, 7, 8, 9, 10, 11 } },
+                { CommunityCenter.AREA_BoilerRoom, new int[] { 20, 21, 22 } },
+                { CommunityCenter.AREA_Bulletin, new int[] { 31, 32, 33, 34, 35 } },
+                { CommunityCenter.AREA_Vault, new int[] { 23, 24, 25, 26 } },
+                { CommunityCenter.AREA_AbandonedJojaMart, new int[] { 36 } }
+            };
+
             helper.Events.Input.ButtonPressed += this.OnButtonPressed;
         }
 
@@ -73,6 +90,7 @@ namespace Instant_Community_Center_Cheat
             if (CommunityCenter != null)
             {
                 Log("Community center found");
+
                 bool communityCenterComplete = CommunityCenter.areAllAreasComplete();
 
                 //If the community center isn't complete and the player doesn't have at least one bundle open,
@@ -83,56 +101,49 @@ namespace Instant_Community_Center_Cheat
                 {
                     Log($"Community Center not complete");
 
-
-
                     //Get all the bundles that are not complete
-                    
-                    List<BundleModel> incompleteBundles = GetBundles(this.Monitor).Where(b => !CommunityCenter.isBundleComplete(b.ID)).ToList();
+                    //priortize the bundles that are currently avaible to the player (where the plaque is visuble)
+                    List<BundleModel> incompleteBundles = GetBundles(this.Monitor).Where(b => !CommunityCenter.isBundleComplete(b.ID)).OrderByDescending(b => BundleAvaiable(b.ID)).ToList();
 
                     //In the list of incomplete bundles, check which items have been donated or not
-                    BundleModel incompleteBundle = incompleteBundles[0];
-
-                    BundleIngredientModel[] allIngredients = incompleteBundle.Ingredients;
-
-                    //get the slots needed for an bundle to be completed
-                    int bundleSlots = incompleteBundle.Slots;
-
-                    BundleIngredientModel[] requiredIngredients = allIngredients.Where(i => IsIngredientNeeded(incompleteBundle, i)).Take(bundleSlots).ToArray();
-                    Log($"Incoplete bundle name: {incompleteBundle.DisplayName}");
-
-                    Log($"Incoplete bundle required ingredients ids: {Join(requiredIngredients.Select(i => i.ItemId))}");
-
-                    return;
+                    List<BundleIngredientModel> requiredIngredients = new List<BundleIngredientModel>();
+                    foreach (BundleModel incompleteBundle in incompleteBundles)
+                    { 
+                        BundleIngredientModel[] allIngredients = incompleteBundle.Ingredients;
+                        //get the slots needed for an bundle to be completed
+                        int bundleSlots = incompleteBundle.Slots;
+                        requiredIngredients.AddRange(allIngredients.Where(i => IsIngredientNeeded(incompleteBundle, i)).Take(bundleSlots));
+                    }
 
                     //get all of the items the player to complete the Comunity Center.
-                    List<Item> missingItems = new List<Item>();
+                    List<Item> missingItems = requiredIngredients.Select(item => ItemRegistry.Create(item.ItemId, item.Stack, (int)item.Quality)).ToList();
 
-                    foreach (KeyValuePair<string, List<List<int>>> pair in BundlesIngredientsInfo)
-                    {
-                        //Log($"Key: {pair.Key}");
-                        //Log("Value");
-                        List<List<int>> value = pair.Value;
-                        foreach (List<int> list in value)
+                    //if there are any intances of items that have the same name and quality, combine them
+                    for (int i = missingItems.Count - 1; i > 0; i--)
+                    { 
+                        Item targetItem = missingItems[i];
+
+                        List<Item> duplicateItems = missingItems.Where(item => item.Name == targetItem.Name && item.Quality == targetItem.Quality).ToList();
+
+
+                        //if more than one item was found, combine all instances into one item and delete the others from the list
+                        if (duplicateItems.Count > 1)
                         {
-                            string str = string.Join(", ", list);
-                            //Log(str);
+                            int itemCount = duplicateItems.Sum(item => item.Stack);
+                            Item newItem = ItemRegistry.Create(targetItem.ItemId, itemCount, targetItem.Quality);
 
-                            Item itemCreated = ItemRegistry.Create(pair.Key, list[1], list[2]);
-
-                            if (CommunityCenter.couldThisIngredienteBeUsedInABundle((StardewValley.Object)itemCreated))
+                            foreach (Item duplicateItem in duplicateItems)
                             {
-                                missingItems.Add(itemCreated);
+                                missingItems.Remove(duplicateItem);
                             }
 
+                            missingItems.Add(newItem);
                         }
                     }
 
-                    //Prioritize list by the stack of that of item(higher numbers first).
-                    missingItems = missingItems.OrderByDescending(i => i.Stack).ToList();
+                    Log($"Missing item names: {Join(missingItems.Select(i => $"{i.Stack} {(ItemQuality)i.Quality} {i.Name}"))}");
 
                     Inventory playerItems = Game1.player.Items;
-
-
 
                     // For each item in that list:
                     foreach (Item item in missingItems)
@@ -147,11 +158,6 @@ namespace Instant_Community_Center_Cheat
                             if (playerItem == null)
                             {
                                 continue;
-                            }
-
-                            if (item.QualifiedItemId == "(O)613")
-                            {
-                                Log("a");
                             }
 
                             bool sameId = playerItem.QualifiedItemId == item.QualifiedItemId;
@@ -183,13 +189,8 @@ namespace Instant_Community_Center_Cheat
                             Log($"The player doesn't have the {item.DisplayName} in their invetory");
                         }
                     }
-
-
-
-
                     
-
-                    // When all items are given, send a message to say which items were added
+                    //todo When all items are given, send a message to say which items were added
                 }
 
                 // If the community center is complete, send a message saying nothing else can be done with this mod
@@ -268,6 +269,20 @@ namespace Instant_Community_Center_Cheat
 
                 yield return bundle;
             }
+        }
+
+        /// <summary>
+        /// Checks if the bundle is accessible to the player (regrldess if it's complete)
+        /// </summary>
+        /// <param name="bundleID"></param>
+        /// <returns></returns>
+        private bool BundleAvaiable(int bundleID)
+        {
+            //check which area the bundle belongs to
+            int areaId = areaBundles.First(kv => kv.Value.Contains(bundleID)).Key;
+
+            //check if the id is avaiable for the player
+            return CommunityCenter.shouldNoteAppearInArea(areaId);
         }
 
         /// <summary>
