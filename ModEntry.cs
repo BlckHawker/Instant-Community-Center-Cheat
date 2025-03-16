@@ -23,17 +23,12 @@ using SObject = StardewValley.Object;
 
 namespace Instant_Community_Center_Cheat
 {
+    //todo add stack trace logs
+    //todo verify the check for when the CC is complete is valid
+    //todo make it so the button to trigger the code is customizable
     /// <summary>The mod entry point.</summary>
     internal sealed class ModEntry : Mod
     {
-        //the key is the QualifiedItemId of the desired item 
-          //each list is a different instance of that item being needed in a bundle
-            //the first element is ???
-            //the second element is the number of that desired item to complete the bundle
-            //the third element is the minimum quality of that item (normal, silver, gold, iridium)
-        private Dictionary<string, List<List<int>>>? bundlesIngredientsInfo;
-        private Dictionary<string, List<List<int>>> BundlesIngredientsInfo => bundlesIngredientsInfo ??= this.Helper.Reflection.GetField<Dictionary<string, List<List<int>>>>(obj: CommunityCenter, name: "bundlesIngredientsInfo").GetValue();
-
         private CommunityCenter? communityCenter;
         private CommunityCenter CommunityCenter => communityCenter ??= (CommunityCenter)Game1.getLocationFromName("CommunityCenter");
         
@@ -102,19 +97,20 @@ namespace Instant_Community_Center_Cheat
 
             if (e.Button.ToString() == desiredButton.ToString())
             {
+                LogTrace($"Received get items key ({desiredButton.ToString()})");
                 GetItems();
             }
         }
 
         private void GetItems()
         {
-            Log($"Get items called");
             if (CommunityCenter != null)
             {
                 //If the user cannot donate items to the community center yet,
                 //say the steps the player currently needs to do in order to get in unlocked
                 if (!Game1.player.hasOrWillReceiveMail(wizard_jumino_event_id))
                 {
+                    LogTrace("The player doesn't have the ability to donate items to the CC yet");
                     //the player has not watched the CC cutscene with Lewis
                     string popUpText;
                     if (!Utility.HasAnyPlayerSeenEvent(community_center_unlocked_event_id))
@@ -123,16 +119,21 @@ namespace Instant_Community_Center_Cheat
                         if (Game1.year == 1 && Game1.season == Season.Spring && Game1.dayOfMonth < 5)
                         {
                             popUpText = "Wait until it's Spring 5 or onwards";
+                            LogTrace("The player needs to wait until Spring 5 or onwards");
+
                         }
                         //it is not raining in the town
                         else if (Game1.locations.First(l => l is Town).IsRainingHere())
                         {
                             popUpText = "Wait until it's not raining";
+                            LogTrace("The player needs to wait until it's not raining");
                         }
                         //it is between 8:00 am and 1:00 pm
                         else if (Game1.timeOfDay < 800 || Game1.timeOfDay > 1300)
                         {
                             popUpText = "Wait until it's between 8am and 1pm";
+                            LogTrace("The player needs to wait until between 8am and 1pm");
+
                         }
 
                         //todo make a check to make sure there aren't any festivals going on in the town
@@ -141,6 +142,8 @@ namespace Instant_Community_Center_Cheat
                         else
                         {
                             popUpText = "Enter the town through the bus station";
+                            LogTrace("The player needs to wait until between 8am and 1pm");
+
                         }
 
                         Game1.showGlobalMessage(popUpText);
@@ -150,25 +153,33 @@ namespace Instant_Community_Center_Cheat
                     //the player needs to interact with the note inside the CC
                     if (!Game1.player.hasOrWillReceiveMail(wizard_jumino_mail_id))
                     {
-                        popUpText = "Interact with the note inside the Community Center";
+                        popUpText = "Interact with the plaque inside the Community Center";
+                        LogTrace("The player needs to interact with the plaque inside the Community Center");
+
                     }
 
                     //if the mail will be recieved tomorrow, tell the player to go to bed
                     else if (Game1.player.mailForTomorrow.Contains(wizard_jumino_mail_id))
                     {
                         popUpText = "Go to bed to recieve mail from the wizard";
+                        LogTrace("The player needs to go to bed to recieve mail from the wizard");
+
                     }
 
                     //the player needs to read the letter from the wizard
                     else if (!Game1.player.mailReceived.Contains(wizard_jumino_mail_id))
                     {
                         popUpText = "Read the letter from the wizard";
+                        LogTrace("The player needs to read the letter from the wizard");
+
                     }
 
                     //the player needs to go to wizards tower and watch the cutscene
                     else
                     { 
                         popUpText = "Go to the wizard's tower";
+                        LogTrace("The player needs to go to the wizard's tower");
+
                     }
 
                     Game1.showGlobalMessage(popUpText);
@@ -182,8 +193,6 @@ namespace Instant_Community_Center_Cheat
                 //Otherwise, if the community center isn't complete,
                 if (!communityCenterComplete)
                 {
-                    Log($"Community Center not complete");
-
                     //Get all the bundles that are not complete
                     //priortize the bundles that are currently avaible to the player (where the plaque is visuble)
                     List<BundleModel> incompleteBundles = GetBundles(this.Monitor).Where(b => !CommunityCenter.isBundleComplete(b.ID)).OrderByDescending(b => BundleAvaiable(b.ID)).ToList();
@@ -228,9 +237,15 @@ namespace Instant_Community_Center_Cheat
 
                     Inventory playerItems = Game1.player.Items;
 
+                    //all the items added to player's inventory
+                    List<Item> addedItems = new List<Item>();
+
+
+                    LogTrace("Adding items to player's inventory...");
                     // For each item in that list:
                     foreach (Item item in missingItems)
                     {
+                        LogTrace($"Attempting to add {item.Stack} {(ItemQuality)item.Quality} {item.DisplayName}...");
                         //if the the item was found within the player's inventory
                         bool foundItem = false;
 
@@ -250,8 +265,8 @@ namespace Instant_Community_Center_Cheat
                             // If the player has the item (of the same required quality or higher) and has at least the necessary stack requirement, move on to the next item
                             if (sameId && validQuality && enoughStack)
                             {
-                                Log($"The player has enough {item.DisplayName} in their inventory");
                                 foundItem = true;
+                                LogTrace("The player already has enough of this item in their inventory");
                                 break;
                             }
                             // If the player has the item (of the same required quality or higher) and doesn't have the stack requirment, add the missing number to that stack
@@ -259,22 +274,31 @@ namespace Instant_Community_Center_Cheat
                             {
                                 int missingCount = Math.Abs(playerItem.Stack - item.Stack);
                                 playerItem.Stack += missingCount;
-                                Log($"The player doesn't have enough {item.DisplayName} in their inventory (but has some missing {missingCount})");
                                 foundItem = true;
+                                addedItems.Add(ItemRegistry.Create(item.QualifiedItemId, missingCount, item.Quality));
+                                LogTrace($"The player already has {item.Stack} of this item in their inventory. Added {missingCount} more");
                                 break;
                             }
                         }
 
-                        // If the player does not have this item in their inventory, and they have room for the item to be there, add the item with the correct stack quantity
+                        // If the player does not have this item in their inventory, and they have room for the item to be there,
+                        // add the item with the correct stack quantity
                         if (!foundItem && playerItems.HasEmptySlots())
                         {
                             Game1.player.addItemsByMenuIfNecessary(new List<Item> { item });
-                            Log($"The player doesn't have the {item.DisplayName} in their invetory");
+                            addedItems.Add(ItemRegistry.Create(item.QualifiedItemId, item.Stack, item.Quality));
+                            LogTrace($"Added the item to the player's inventory");
+                        }
+
+                        else
+                        { 
+                            LogTrace($"The player doesn't have enough space in their invetory to add this item");
                         }
                     }
 
-                    //todo When all items are given, send a message to say which items were added
+                    //When all items are given, send a message to say which items were added
                     Game1.showGlobalMessage("Added items to inventory");
+                    LogTrace("Finished adding items to player's inventory");
 
                 }
 
@@ -282,8 +306,8 @@ namespace Instant_Community_Center_Cheat
                 { 
                     //todo If the community center is complete, send a message saying nothing else can be done with this mod
                     Game1.showGlobalMessage("Community Center is complete, no items to add");
+                    LogTrace("Community Center is complete, no items to add");
                 }
-
             }
 
             else
@@ -297,10 +321,16 @@ namespace Instant_Community_Center_Cheat
             this.Monitor.Log(message, level);
         }
 
+        private void LogTrace(string message)
+        {
+            Log(message, LogLevel.Trace);
+        }
+
         private string Join<T>(IEnumerable<T> collection, string separator = ", ")
         { 
             return string.Join(separator, collection);
         }
+
 
         //The following code below was taken straight from Pathoschild's Look Up Anything mod
 
