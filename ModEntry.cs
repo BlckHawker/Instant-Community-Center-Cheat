@@ -26,6 +26,9 @@ namespace Instant_Community_Center_Cheat
     //todo add stack trace logs
     //todo verify the check for when the CC is complete is valid
     //todo make it so the button to trigger the code is customizable
+    //todo make a configurable thing where the items auttomatically get added to the correct slots
+    //todo make this mod compatible with the remixed versions
+    //todo make it so the mod gives player's enough money in order to buy the money bundles
     /// <summary>The mod entry point.</summary>
     internal sealed class ModEntry : Mod
     {
@@ -188,8 +191,6 @@ namespace Instant_Community_Center_Cheat
 
                 bool communityCenterComplete = CommunityCenter.areAllAreasComplete();
 
-                //todo the following reasons are why the CC is not un
-
                 //Otherwise, if the community center isn't complete,
                 if (!communityCenterComplete)
                 {
@@ -300,6 +301,43 @@ namespace Instant_Community_Center_Cheat
                     Game1.showGlobalMessage("Added items to inventory");
                     LogTrace("Finished adding items to player's inventory");
 
+                    //Check if there are any money bundles
+                    LogTrace("Checking if the player needs money...");
+
+                    //todo fix a bug where too much money was given
+                    List<bool> bundlesComplete = areaBundles[CommunityCenter.AREA_Vault].Select(id => CommunityCenter.isBundleComplete(id)).ToList();
+                    Log($"Vault bundle ids: {Join(areaBundles[CommunityCenter.AREA_Vault].Select(id => id))}");
+                    Log($"Complete money bundles {Join(bundlesComplete)}");
+                    Log($"Vault complete: {Game1.player.hasOrWillReceiveMail("ccVault").ToString()}");
+                    List<int> moneyBundles =  areaBundles[CommunityCenter.AREA_Vault].Where(id => !CommunityCenter.isBundleComplete(id)).Select(id => GetBundleMoneyValue(id)).ToList();
+
+                    if (moneyBundles.Count > 0)
+                    {
+                        LogTrace($"Player needs to donate to the following bundles: {Join(moneyBundles)}");
+                        LogTrace($"The player has {Game1.player.Money} gold");
+
+                        int moneyRequired = moneyBundles.Sum();
+
+                        if (moneyRequired > Game1.player.Money)
+                        {
+                            int moneyNeeded = moneyRequired - Game1.player.Money;
+                            LogTrace($"Giving the {moneyNeeded} gold...");
+                            Game1.player.Money = moneyNeeded;
+
+                        }
+
+                        else
+                        {
+                            LogTrace("The player has enough money to afford the bundles");
+                        }
+
+                    }
+
+                    else
+                    {
+                        LogTrace("The player doesn't need to donate any money");
+                    }
+
                 }
 
                 else
@@ -314,6 +352,31 @@ namespace Instant_Community_Center_Cheat
             {
                 Log("Community center not found");
             }
+        }
+
+        //Todo make this dynamic by reading Bundles.json
+        /// <summary>
+        /// Get the money value of a specfic bundle
+        /// </summary>
+        /// <param name="bundleId">the id of the bundle</param>
+        /// <returns></returns>
+        private int GetBundleMoneyValue(int bundleId)
+        {
+            switch (bundleId)
+            {
+                case 23:
+                    return 2500;
+                case 24:
+                    return 5000;
+                case 25:
+                    return 10000;
+                case 26:
+                    return 25000;
+                default: 
+                    return 0;
+            }
+
+            
         }
 
         private void Log(string message, LogLevel level = LogLevel.Debug)
@@ -498,7 +561,7 @@ namespace Instant_Community_Center_Cheat
         /// <param name="RewardData">The unparsed reward description, which can be parsed with <see cref="StardewValley.Utility.getItemFromStandardTextDescription"/>.</param>
         /// <param name="Ingredients">The required item ingredients.</param>
         /// <param name="Slots">The amount of items needed in order to complete the bundle</param>
-        internal record BundleModel(int ID, string Name, string DisplayName, string Area, string RewardData, BundleIngredientModel[] Ingredients, int Slots);
+        private record BundleModel(int ID, string Name, string DisplayName, string Area, string RewardData, BundleIngredientModel[] Ingredients, int Slots);
 
 
         /// <summary>An item slot for a bundle.</summary>
@@ -506,9 +569,9 @@ namespace Instant_Community_Center_Cheat
         /// <param name="ItemId">The required item's qualified or unqualified item ID, or category ID, or -1 for a monetary bundle.</param>
         /// <param name="Stack">The number of items required.</param>
         /// <param name="Quality">The required item quality.</param>
-        internal record BundleIngredientModel(int Index, string ItemId, int Stack, ItemQuality Quality);
+        private record BundleIngredientModel(int Index, string ItemId, int Stack, ItemQuality Quality);
 
-        internal enum ItemQuality
+        private enum ItemQuality
         {
             Normal = SObject.lowQuality,
             Silver = SObject.medQuality,
