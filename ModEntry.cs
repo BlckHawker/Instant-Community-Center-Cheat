@@ -43,7 +43,14 @@ namespace Instant_Community_Center_Cheat
         private Dictionary<int, int[]> areaBundles;
 
         //lewis unlocking the community center
-        private const string community_center_unlock_id = "611439";
+        private const string community_center_unlocked_event_id = "611439";
+
+        //wizard sends mail for player to talk to them
+        private const string wizard_jumino_mail_id = "wizardJunimoNote";
+
+        //player goes to wizard tower to read jumino text
+        private const string wizard_jumino_event_id = "canReadJunimoText";
+
 
         /*********
         ** Public methods
@@ -101,36 +108,67 @@ namespace Instant_Community_Center_Cheat
 
         private void GetItems()
         {
-
-
             Log($"Get items called");
             if (CommunityCenter != null)
             {
-                //the player has not watched the CC cutscene with Lewis
-
-                string popUpText;
-                if (!Utility.HasAnyPlayerSeenEvent(community_center_unlock_id))
+                //If the user cannot donate items to the community center yet,
+                //say the steps the player currently needs to do in order to get in unlocked
+                if (!Game1.player.hasOrWillReceiveMail(wizard_jumino_event_id))
                 {
-                    //it is spring 5th year 1, or onwards
-                    if (Game1.year == 1 && Game1.season == Season.Spring && Game1.dayOfMonth < 5)
+                    //the player has not watched the CC cutscene with Lewis
+                    string popUpText;
+                    if (!Utility.HasAnyPlayerSeenEvent(community_center_unlocked_event_id))
                     {
-                        popUpText = "Wait until it's Spring 5 or onwards";
-                    }
-                    //it is not raining in the town
-                    else if (Game1.locations.First(l => l is Town).IsRainingHere())
-                    {
-                        popUpText = "Wait until it's not raining";
-                    }
-                    //it is between 8:00 am and 1:00 pm
-                    else if (Game1.timeOfDay < 800 || Game1.timeOfDay > 1300)
-                    {
-                        popUpText = "Wait until it's between 8am and 1pm";
+                        //it is spring 5th year 1, or onwards
+                        if (Game1.year == 1 && Game1.season == Season.Spring && Game1.dayOfMonth < 5)
+                        {
+                            popUpText = "Wait until it's Spring 5 or onwards";
+                        }
+                        //it is not raining in the town
+                        else if (Game1.locations.First(l => l is Town).IsRainingHere())
+                        {
+                            popUpText = "Wait until it's not raining";
+                        }
+                        //it is between 8:00 am and 1:00 pm
+                        else if (Game1.timeOfDay < 800 || Game1.timeOfDay > 1300)
+                        {
+                            popUpText = "Wait until it's between 8am and 1pm";
+                        }
+
+                        //todo make a check to make sure there aren't any festivals going on in the town
+
+                        //the player must enter Pelican Town from the Bus Stop
+                        else
+                        {
+                            popUpText = "Enter the town through the bus station";
+                        }
+
+                        Game1.showGlobalMessage(popUpText);
+                        return;
                     }
 
-                    //the player must enter Pelican Town from the Bus Stop
-                    else
+                    //the player needs to interact with the note inside the CC
+                    if (!Game1.player.hasOrWillReceiveMail(wizard_jumino_mail_id))
                     {
-                        popUpText = "Enter the town through the bus station";
+                        popUpText = "Interact with the note inside the Community Center";
+                    }
+
+                    //if the mail will be recieved tomorrow, tell the player to go to bed
+                    else if (Game1.player.mailForTomorrow.Contains(wizard_jumino_mail_id))
+                    {
+                        popUpText = "Go to bed to recieve mail from the wizard";
+                    }
+
+                    //the player needs to read the letter from the wizard
+                    else if (!Game1.player.mailReceived.Contains(wizard_jumino_mail_id))
+                    {
+                        popUpText = "Read the letter from the wizard";
+                    }
+
+                    //the player needs to go to wizards tower and watch the cutscene
+                    else
+                    { 
+                        popUpText = "Go to the wizard's tower";
                     }
 
                     Game1.showGlobalMessage(popUpText);
@@ -138,11 +176,6 @@ namespace Instant_Community_Center_Cheat
                 }
 
                 bool communityCenterComplete = CommunityCenter.areAllAreasComplete();
-
-                //todo If the community center isn't complete and the player doesn't have at least one bundle open,
-                //say the steps the player currently needs to do in order to get in unlocked
-                List<int> allBundlesIDs = areaBundles.Values.SelectMany(x => x).ToList();
-
 
                 //todo the following reasons are why the CC is not un
 
@@ -158,7 +191,7 @@ namespace Instant_Community_Center_Cheat
                     //In the list of incomplete bundles, check which items have been donated or not
                     List<BundleIngredientModel> requiredIngredients = new List<BundleIngredientModel>();
                     foreach (BundleModel incompleteBundle in incompleteBundles)
-                    { 
+                    {
                         BundleIngredientModel[] allIngredients = incompleteBundle.Ingredients;
                         //get the slots needed for an bundle to be completed
                         int bundleSlots = incompleteBundle.Slots;
@@ -170,7 +203,7 @@ namespace Instant_Community_Center_Cheat
 
                     //if there are any intances of items that have the same name and quality, combine them
                     for (int i = missingItems.Count - 1; i > 0; i--)
-                    { 
+                    {
                         Item targetItem = missingItems[i];
 
                         List<Item> duplicateItems = missingItems.Where(item => item.Name == targetItem.Name && item.Quality == targetItem.Quality).ToList();
@@ -239,11 +272,18 @@ namespace Instant_Community_Center_Cheat
                             Log($"The player doesn't have the {item.DisplayName} in their invetory");
                         }
                     }
-                    
+
                     //todo When all items are given, send a message to say which items were added
+                    Game1.showGlobalMessage("Added items to inventory");
+
                 }
 
-                // If the community center is complete, send a message saying nothing else can be done with this mod
+                else
+                { 
+                    //todo If the community center is complete, send a message saying nothing else can be done with this mod
+                    Game1.showGlobalMessage("Community Center is complete, no items to add");
+                }
+
             }
 
             else
@@ -321,6 +361,7 @@ namespace Instant_Community_Center_Cheat
             }
         }
 
+        //todo possibly replace this by looking at the function addJunimoNote
         /// <summary>
         /// Checks if the bundle is accessible to the player (regrldess if it's complete)
         /// </summary>
@@ -335,6 +376,7 @@ namespace Instant_Community_Center_Cheat
             return CommunityCenter.shouldNoteAppearInArea(areaId);
         }
 
+        //todo try to make this dynamic with the game's code
         /// <summary>
         /// Get the number of items slots needed in order to complete the bundle
         /// </summary>
@@ -351,8 +393,11 @@ namespace Instant_Community_Center_Cheat
                 case 2: //Fall Crops
                     return 4;
                 case 3: //Quality Crops
+                    return 3;
                 case 4: //Animal
+                    return 5;
                 case 5: //Artisan
+                    return 6;
                 case 13: //Spring Foraging
                     return 4;
                 case 14: //Summer Foraging
