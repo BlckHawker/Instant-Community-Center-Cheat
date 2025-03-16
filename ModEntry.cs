@@ -18,6 +18,7 @@ using StardewValley.Objects;
 using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 using xTile.Layers;
+using HarmonyLib;
 using SObject = StardewValley.Object;
 
 namespace Instant_Community_Center_Cheat
@@ -41,6 +42,9 @@ namespace Instant_Community_Center_Cheat
         //the value is the list of ids corresponding the the bundles within that area
         private Dictionary<int, int[]> areaBundles;
 
+        //lewis unlocking the community center
+        private const string community_center_unlock_id = "611439";
+
         /*********
         ** Public methods
         *********/
@@ -59,6 +63,17 @@ namespace Instant_Community_Center_Cheat
                 { CommunityCenter.AREA_Vault, new int[] { 23, 24, 25, 26 } },
                 { CommunityCenter.AREA_AbandonedJojaMart, new int[] { 36 } }
             };
+
+            HarmonyPatches.Initialize(Monitor);
+
+            var harmony = new Harmony(this.ModManifest.UniqueID);
+
+            harmony.Patch(
+               original: AccessTools.Method(typeof(StardewValley.Preconditions), nameof(StardewValley.Preconditions.Weather)),
+               postfix: new HarmonyMethod(typeof(HarmonyPatches), nameof(HarmonyPatches.Weather_Postfix))
+            );
+
+            harmony.PatchAll();
 
             helper.Events.Input.ButtonPressed += this.OnButtonPressed;
         }
@@ -86,15 +101,50 @@ namespace Instant_Community_Center_Cheat
 
         private void GetItems()
         {
+
+
             Log($"Get items called");
             if (CommunityCenter != null)
             {
-                Log("Community center found");
+                //the player has not watched the CC cutscene with Lewis
+
+                string popUpText;
+                if (!Utility.HasAnyPlayerSeenEvent(community_center_unlock_id))
+                {
+                    //it is spring 5th year 1, or onwards
+                    if (Game1.year == 1 && Game1.season == Season.Spring && Game1.dayOfMonth < 5)
+                    {
+                        popUpText = "Wait until it's Spring 5 or onwards";
+                    }
+                    //it is not raining in the town
+                    else if (Game1.locations.First(l => l is Town).IsRainingHere())
+                    {
+                        popUpText = "Wait until it's not raining";
+                    }
+                    //it is between 8:00 am and 1:00 pm
+                    else if (Game1.timeOfDay < 800 || Game1.timeOfDay > 1300)
+                    {
+                        popUpText = "Wait until it's between 8am and 1pm";
+                    }
+
+                    //the player must enter Pelican Town from the Bus Stop
+                    else
+                    {
+                        popUpText = "Enter the town through the bus station";
+                    }
+
+                    Game1.showGlobalMessage(popUpText);
+                    return;
+                }
 
                 bool communityCenterComplete = CommunityCenter.areAllAreasComplete();
 
-                //If the community center isn't complete and the player doesn't have at least one bundle open,
+                //todo If the community center isn't complete and the player doesn't have at least one bundle open,
                 //say the steps the player currently needs to do in order to get in unlocked
+                List<int> allBundlesIDs = areaBundles.Values.SelectMany(x => x).ToList();
+
+
+                //todo the following reasons are why the CC is not un
 
                 //Otherwise, if the community center isn't complete,
                 if (!communityCenterComplete)

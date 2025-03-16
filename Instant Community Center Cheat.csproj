@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+	<EnableHarmony>true</EnableHarmony>
     <TargetFramework>net6.0</TargetFramework>
     <RootNamespace>Instant_Community_Center_Cheat</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
