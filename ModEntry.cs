@@ -310,7 +310,7 @@ namespace Instant_Community_Center_Cheat
                         {
                             int moneyNeeded = moneyRequired - Game1.player.Money;
                             LogTrace($"Giving the {moneyNeeded} gold...");
-                            Game1.player.Money = moneyNeeded;
+                            Game1.player.Money += moneyNeeded;
 
                         }
 
