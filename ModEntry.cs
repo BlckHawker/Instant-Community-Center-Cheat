@@ -6,15 +6,15 @@ using StardewValley.Locations;
 using StardewValley.Menus;
 using HarmonyLib;
 using SObject = StardewValley.Object;
+using GenericModConfigMenu;
+using StardewModdingAPI.Utilities;
 
 namespace Instant_Community_Center_Cheat
 {
-    //todo add stack trace logs
     //todo verify the check for when the CC is complete is valid
     //todo make it so the button to trigger the code is customizable
     //todo make a configurable thing where the items auttomatically get added to the correct slots
     //todo make this mod compatible with the remixed versions
-    //todo make it so the mod gives player's enough money in order to buy the money bundles
     /// <summary>The mod entry point.</summary>
     internal sealed class ModEntry : Mod
     {
@@ -35,6 +35,9 @@ namespace Instant_Community_Center_Cheat
         //player goes to wizard tower to read jumino text
         private const string wizard_jumino_event_id = "canReadJunimoText";
 
+        /// <summary>The mod configuration.</summary>
+        public ModConfig Config { get; set;  }
+
 
         /*********
         ** Public methods
@@ -43,6 +46,9 @@ namespace Instant_Community_Center_Cheat
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
+            // read config
+            this.Config = helper.ReadConfig<ModConfig>();
+
             //todo make this dynamic by reading from Bundles.json
             areaBundles = new Dictionary<int, int[]>()
             {
@@ -67,12 +73,40 @@ namespace Instant_Community_Center_Cheat
             harmony.PatchAll();
 
             helper.Events.Input.ButtonPressed += this.OnButtonPressed;
+            helper.Events.GameLoop.GameLaunched += this.OnGameLaunched;
         }
 
 
         /*********
         ** Private methods
         *********/
+
+        private void OnGameLaunched(object sender, GameLaunchedEventArgs e)
+        {
+            // get Generic Mod Config Menu's API (if it's installed)
+            var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            if (configMenu is null)
+                return;
+
+            // register mod
+
+            Action reset = () => this.Config.GiveCCItemKey = ModConfig.DefaultGiveCCItemKey;
+            Action save = () => this.Helper.WriteConfig(Config);
+
+            configMenu.Register(this.ModManifest, reset, save);
+
+            configMenu.AddKeybind(
+                    mod: this.ModManifest,
+                    name: () => "Give item key",
+                    tooltip: () => "The key to press to get all the items to complete the Community Center",
+                    getValue: () => this.Config.GiveCCItemKey,
+                    setValue: value => this.Config.GiveCCItemKey = value
+                );
+
+
+            
+        }
+
         /// <summary>Raised after the player presses a button on the keyboard, controller, or mouse.</summary>
         /// <param name="sender">The event sender.</param>
         /// <param name="e">The event data.</param>
@@ -82,14 +116,15 @@ namespace Instant_Community_Center_Cheat
             if (!Context.IsWorldReady || !Context.IsPlayerFree)
                 return;
 
-            const char desiredButton = 'L';
 
-            if (e.Button.ToString() == desiredButton.ToString())
+
+            if (new KeybindList(this.Config.GiveCCItemKey).JustPressed())
             {
-                LogTrace($"Received get items key ({desiredButton.ToString()})");
+                LogTrace($"Received get items key ({this.Config.GiveCCItemKey.ToString()})");
                 GetItems();
             }
         }
+
 
         private void GetItems()
         {
