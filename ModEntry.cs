@@ -1,23 +1,9 @@
-﻿
-using System;
-using System.Collections.Generic;
-using System.Numerics;
-using System.Xml.Linq;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Content;
-using StardewModdingAPI;
+﻿using StardewModdingAPI;
 using StardewModdingAPI.Events;
-using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Inventories;
-using StardewValley.ItemTypeDefinitions;
 using StardewValley.Locations;
 using StardewValley.Menus;
-using StardewValley.Minigames;
-using StardewValley.Objects;
-using StardewValley.TerrainFeatures;
-using StardewValley.Tools;
-using xTile.Layers;
 using HarmonyLib;
 using SObject = StardewValley.Object;
 
@@ -196,7 +182,9 @@ namespace Instant_Community_Center_Cheat
                 {
                     //Get all the bundles that are not complete
                     //priortize the bundles that are currently avaible to the player (where the plaque is visuble)
-                    List<BundleModel> incompleteBundles = GetBundles(this.Monitor).Where(b => !CommunityCenter.isBundleComplete(b.ID)).OrderByDescending(b => BundleAvaiable(b.ID)).ToList();
+                    //ignore the abandanoned joja
+                    List<BundleModel> incompleteBundles = GetBundles(this.Monitor).Where(b => !CommunityCenter.isBundleComplete(b.ID) && !areaBundles[CommunityCenter.AREA_AbandonedJojaMart].Contains(b.ID))
+                                                         .OrderByDescending(b => BundleAvaiable(b.ID)).ToList();
 
                     //In the list of incomplete bundles, check which items have been donated or not
                     List<BundleIngredientModel> requiredIngredients = new List<BundleIngredientModel>();
@@ -304,7 +292,7 @@ namespace Instant_Community_Center_Cheat
                     //Check if there are any money bundles
                     LogTrace("Checking if the player needs money...");
 
-                    //todo fix a bug where too much money was given
+                    //Note: this is a bug where all of these ids are always considered incomplete (even when the vault area is considered complete)
                     List<bool> bundlesComplete = areaBundles[CommunityCenter.AREA_Vault].Select(id => CommunityCenter.isBundleComplete(id)).ToList();
                     Log($"Vault bundle ids: {Join(areaBundles[CommunityCenter.AREA_Vault].Select(id => id))}");
                     Log($"Complete money bundles {Join(bundlesComplete)}");
