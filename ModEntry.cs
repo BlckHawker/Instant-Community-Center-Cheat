@@ -365,7 +365,7 @@ namespace Instant_Community_Center_Cheat
 
                 else
                 { 
-                    //todo If the community center is complete, send a message saying nothing else can be done with this mod
+                    //If the community center is complete, send a message saying nothing else can be done with this mod
                     Game1.showGlobalMessage("Community Center is complete, no items to add");
                     LogTrace("Community Center is complete, no items to add");
                 }
