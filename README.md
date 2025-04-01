@@ -26,5 +26,5 @@ Press `L` (configurable with [Generic Mod Config Menu](https://www.nexusmods.com
 ### See also
 - Discord username: `blckhawker`
     - Message me if you need support with the mod. Please don't spam as I am a solo developer
-- Release notes [INSERT LINK]
+- [Releases](https://github.com/BlckHawker/Instant-Community-Center-Cheat/releases)
 - [Source code](https://github.com/BlckHawker/Instant-Community-Center-Cheat)
