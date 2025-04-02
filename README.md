@@ -15,9 +15,7 @@ Press `L` (configurable with [Generic Mod Config Menu](https://www.nexusmods.com
 
 ### Known Bugs
 - The check for if the vault bundles are complete are always false, meaning the mod will continue to give the player additonal money until the Community Center is complete.
-- The mod will tell the player to walk into town when there's an event, and the player cannot get the cutscene to unlock the Community Center
-
-
+  
 ### Future Features
 - Work with remixed Community Center
 - Have a mode to optionally skip needing to place items into slots
