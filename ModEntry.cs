@@ -20,6 +20,9 @@ namespace Instant_Community_Center_Cheat
     {
         private CommunityCenter? communityCenter;
         private CommunityCenter CommunityCenter => communityCenter ??= (CommunityCenter)Game1.getLocationFromName("CommunityCenter");
+
+        private Town? town;
+        private Town Town => town ??= (Town)Game1.locations.First(l => l is Town);
         
 
         //key is the area id in the CC
@@ -147,10 +150,17 @@ namespace Instant_Community_Center_Cheat
 
                         }
                         //it is not raining in the town
-                        else if (Game1.locations.First(l => l is Town).IsRainingHere())
+                        else if (Town.IsRainingHere())
                         {
                             popUpText = "Wait until it's not raining";
                             LogTrace("The player needs to wait until it's not raining");
+                        }
+                        //check to make sure there aren't any festivals going on in the town
+                        else if (Utility.isFestivalDay(Town.locationContextId))
+                        {
+                            popUpText = "Wait until there isn't a festival in town";
+                            LogTrace("The player needs to wait until there isn't a festival in town");
+
                         }
                         //it is between 8:00 am and 1:00 pm
                         else if (Game1.timeOfDay < 800 || Game1.timeOfDay > 1300)
@@ -159,9 +169,6 @@ namespace Instant_Community_Center_Cheat
                             LogTrace("The player needs to wait until between 8am and 1pm");
 
                         }
-
-                        //todo make a check to make sure there aren't any festivals going on in the town
-
                         //the player must enter Pelican Town from the Bus Stop
                         else
                         {
