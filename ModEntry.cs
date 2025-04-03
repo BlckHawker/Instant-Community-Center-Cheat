@@ -23,7 +23,7 @@ namespace Instant_Community_Center_Cheat
 
         private Town? town;
         private Town Town => town ??= (Town)Game1.locations.First(l => l is Town);
-        
+
 
         //key is the area id in the CC
         //the value is the list of ids corresponding the the bundles within that area
@@ -39,7 +39,7 @@ namespace Instant_Community_Center_Cheat
         private const string wizard_jumino_event_id = "canReadJunimoText";
 
         /// <summary>The mod configuration.</summary>
-        public ModConfig Config { get; set;  }
+        public ModConfig Config { get; set; }
 
 
         /*********
@@ -106,8 +106,10 @@ namespace Instant_Community_Center_Cheat
                     setValue: value => this.Config.GiveCCItemKey = value
                 );
 
+            //todo make it so the the joja check is a boolean through the mod config
 
-            
+
+
         }
 
         /// <summary>Raised after the player presses a button on the keyboard, controller, or mouse.</summary>
@@ -124,13 +126,82 @@ namespace Instant_Community_Center_Cheat
             if (new KeybindList(this.Config.GiveCCItemKey).JustPressed())
             {
                 LogTrace($"Received get items key ({this.Config.GiveCCItemKey.ToString()})");
-                GetItems();
+
+                if (PlayerSeenCommunityCenterCutscene())
+                {
+                    //if (this.Config.Joja)
+                    if (true)
+                    {
+                        GetJoja();
+                    }
+
+                    else
+                    { 
+                        GetItems();
+                    }
+                }
             }
         }
 
+        private bool PlayerSeenCommunityCenterCutscene()
+        {
+            bool cutsceneSeen = Utility.HasAnyPlayerSeenEvent(community_center_unlocked_event_id);
+            //the player has not watched the CC cutscene with Lewis
+            string popUpText;
+            if (!cutsceneSeen)
+            {
+                //it is spring 5th year 1, or onwards
+                if (Game1.year == 1 && Game1.season == Season.Spring && Game1.dayOfMonth < 5)
+                {
+                    popUpText = "Wait until it's Spring 5 or onwards";
+                    LogTrace("The player needs to wait until Spring 5 or onwards");
 
+                }
+                //it is not raining in the town
+                else if (Town.IsRainingHere())
+                {
+                    popUpText = "Wait until it's not raining";
+                    LogTrace("The player needs to wait until it's not raining");
+                }
+                //check to make sure there aren't any festivals going on in the town
+                else if (Utility.isFestivalDay(Town.locationContextId))
+                {
+                    popUpText = "Wait until there isn't a festival in town";
+                    LogTrace("The player needs to wait until there isn't a festival in town");
+
+                }
+                //it is between 8:00 am and 1:00 pm
+                else if (Game1.timeOfDay < 800 || Game1.timeOfDay > 1300)
+                {
+                    popUpText = "Wait until it's between 8am and 1pm";
+                    LogTrace("The player needs to wait until between 8am and 1pm");
+
+                }
+                //the player must enter Pelican Town from the Bus Stop
+                else
+                {
+                    popUpText = "Enter the town through the bus station";
+                    LogTrace("The player needs to wait until between 8am and 1pm");
+
+                }
+
+                Game1.showGlobalMessage(popUpText);
+            }
+
+            return cutsceneSeen;
+        }
+
+        /// <summary>
+        /// Give the player items to complete the CC
+        /// </summary>
         private void GetItems()
         {
+            if(BoughtJojaMembership())
+            {
+                LogTrace("Cannot give player items as they bought the Joja membership");
+                Game1.showGlobalMessage("Cannot give items as the Joja membership has been bought");
+                return; 
+            }
             if (CommunityCenter != null)
             {
                 //If the user cannot donate items to the community center yet,
@@ -138,48 +209,7 @@ namespace Instant_Community_Center_Cheat
                 if (!Game1.player.hasOrWillReceiveMail(wizard_jumino_event_id))
                 {
                     LogTrace("The player doesn't have the ability to donate items to the CC yet");
-                    //the player has not watched the CC cutscene with Lewis
                     string popUpText;
-                    if (!Utility.HasAnyPlayerSeenEvent(community_center_unlocked_event_id))
-                    {
-                        //it is spring 5th year 1, or onwards
-                        if (Game1.year == 1 && Game1.season == Season.Spring && Game1.dayOfMonth < 5)
-                        {
-                            popUpText = "Wait until it's Spring 5 or onwards";
-                            LogTrace("The player needs to wait until Spring 5 or onwards");
-
-                        }
-                        //it is not raining in the town
-                        else if (Town.IsRainingHere())
-                        {
-                            popUpText = "Wait until it's not raining";
-                            LogTrace("The player needs to wait until it's not raining");
-                        }
-                        //check to make sure there aren't any festivals going on in the town
-                        else if (Utility.isFestivalDay(Town.locationContextId))
-                        {
-                            popUpText = "Wait until there isn't a festival in town";
-                            LogTrace("The player needs to wait until there isn't a festival in town");
-
-                        }
-                        //it is between 8:00 am and 1:00 pm
-                        else if (Game1.timeOfDay < 800 || Game1.timeOfDay > 1300)
-                        {
-                            popUpText = "Wait until it's between 8am and 1pm";
-                            LogTrace("The player needs to wait until between 8am and 1pm");
-
-                        }
-                        //the player must enter Pelican Town from the Bus Stop
-                        else
-                        {
-                            popUpText = "Enter the town through the bus station";
-                            LogTrace("The player needs to wait until between 8am and 1pm");
-
-                        }
-
-                        Game1.showGlobalMessage(popUpText);
-                        return;
-                    }
 
                     //the player needs to interact with the note inside the CC
                     if (!Game1.player.hasOrWillReceiveMail(wizard_jumino_mail_id))
@@ -217,10 +247,8 @@ namespace Instant_Community_Center_Cheat
                     return;
                 }
 
-                bool communityCenterComplete = CommunityCenter.areAllAreasComplete();
-
                 //Otherwise, if the community center isn't complete,
-                if (!communityCenterComplete)
+                if (!CommunityCenter.areAllAreasComplete())
                 {
                     //Get all the bundles that are not complete
                     //priortize the bundles that are currently avaible to the player (where the plaque is visuble)
@@ -336,7 +364,7 @@ namespace Instant_Community_Center_Cheat
 
                     //Note: this is a bug where all of these ids are always considered incomplete (even when the vault area is considered complete)
                     List<bool> bundlesComplete = areaBundles[CommunityCenter.AREA_Vault].Select(id => CommunityCenter.isBundleComplete(id)).ToList();
-                    Log($"Vault bundle ids: {Join(areaBundles[CommunityCenter.AREA_Vault].Select(id => id))}");
+                    Log($"Vault bundle ids: {Join(areaBundles[CommunityCenter.AREA_Vault])}");
                     Log($"Complete money bundles {Join(bundlesComplete)}");
                     Log($"Vault complete: {Game1.player.hasOrWillReceiveMail("ccVault").ToString()}");
                     List<int> moneyBundles =  areaBundles[CommunityCenter.AREA_Vault].Where(id => !CommunityCenter.isBundleComplete(id)).Select(id => GetBundleMoneyValue(id)).ToList();
@@ -344,22 +372,7 @@ namespace Instant_Community_Center_Cheat
                     if (moneyBundles.Count > 0)
                     {
                         LogTrace($"Player needs to donate to the following bundles: {Join(moneyBundles)}");
-                        LogTrace($"The player has {Game1.player.Money} gold");
-
-                        int moneyRequired = moneyBundles.Sum();
-
-                        if (moneyRequired > Game1.player.Money)
-                        {
-                            int moneyNeeded = moneyRequired - Game1.player.Money;
-                            LogTrace($"Giving the {moneyNeeded} gold...");
-                            Game1.player.Money += moneyNeeded;
-
-                        }
-
-                        else
-                        {
-                            LogTrace("The player has enough money to afford the bundles");
-                        }
+                        GiveRequiredMoney(moneyBundles.Sum());
 
                     }
 
@@ -382,6 +395,73 @@ namespace Instant_Community_Center_Cheat
             {
                 Log("Community center not found");
             }
+        }
+
+        /// <summary>
+        /// Gives the player money to complete the Joja CC
+        /// </summary>
+        private void GetJoja()
+        {
+
+            //key - id of the upgrade
+            //value - the amount of money needed for the upgrade
+            Dictionary<string, int> jojaUpgrades = new Dictionary<string, int>()
+            {
+                { "jojaVault", 40000 },
+                { "jojaPantry", 35000 },
+                { "jojaBoilerRoom", 15000 },
+                { "jojaCraftsRoom", 25000 },
+                { "jojaFishTank", 20000 }
+            };
+
+            //todo make a check if the player has the membership card
+            string popUpText = "";
+
+            if (!Utility.hasFinishedJojaRoute())
+            {
+                //player buys the joja membership
+                if (!BoughtJojaMembership())
+                {
+                    popUpText = "Buy Joja membership";
+                    //if the player doesn't have enough money for the membership, give it to them
+                    GiveRequiredMoney(5000);
+                }
+
+                //the player has the joja memeber ship, and needs to go to bed in order to get the mail
+                else if (BoughtJojaMembership() && !Game1.MasterPlayer.mailReceived.Contains("JojaMember"))
+                {
+                    LogTrace("The player has the joja memeber ship, and needs to go to bed in order to get the mail");
+                    popUpText = "Go to bed";
+                }
+
+                //todo if there is an upgrade in progress, tell the player to go to bed
+                else if (jojaUpgrades.Keys.Any(id => Game1.player.mailForTomorrow.Contains(id + "%&NL&%")))
+                {
+                    LogTrace("There is an upgrade in progress and the player needs to go to bed for it to finish");
+                    popUpText = "Go to bed";
+                }
+
+                //check which upgrades the player has not gotten yet
+                else if (jojaUpgrades.Keys.Any(id => !Game1.MasterPlayer.hasOrWillReceiveMail(id)))
+                {
+                    Dictionary<string, int> requiredJojaUpgrades = jojaUpgrades.Where(kv => !Game1.MasterPlayer.hasOrWillReceiveMail(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+                    string requiredIds = Join(requiredJojaUpgrades.Keys);
+                    int moneyRequired = requiredJojaUpgrades.Select(kv => kv.Value).Sum();
+                    LogTrace($"The player needs {moneyRequired} money for the following upgrades: {requiredJojaUpgrades.Select(kv => $"{kv.Key} ({kv.Value})")}");
+                    GiveRequiredMoney(moneyRequired);
+                    popUpText = $"Gave money for upgrades";
+                }
+
+            }
+
+            else
+            {
+                //todo test this
+                popUpText = "Joja Community Center is complete, no money to add";
+            }
+
+            Game1.showGlobalMessage(popUpText);
+            LogTrace(popUpText);
         }
 
         //Todo make this dynamic by reading Bundles.json
@@ -481,6 +561,27 @@ namespace Instant_Community_Center_Cheat
                 }
 
                 yield return bundle;
+            }
+        }
+
+        private bool BoughtJojaMembership()
+        {
+            return Game1.MasterPlayer.hasOrWillReceiveMail("JojaMember");
+        }
+
+        /// <summary>
+        /// Gives an amount of money
+        /// </summary>
+        /// <param name="moneyRequired">The amount of money required</param>
+        private void GiveRequiredMoney(int moneyRequired)
+        {
+            LogTrace($"The player has {Game1.player.Money} gold");
+            if (moneyRequired > Game1.player.Money)
+            {
+                int moneyNeeded = moneyRequired - Game1.player.Money;
+                LogTrace($"Giving the {moneyNeeded} gold...");
+                Game1.player.Money += moneyNeeded;
+
             }
         }
 
