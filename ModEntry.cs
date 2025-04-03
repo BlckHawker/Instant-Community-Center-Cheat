@@ -93,7 +93,10 @@ namespace Instant_Community_Center_Cheat
 
             // register mod
 
-            Action reset = () => this.Config.GiveCCItemKey = ModConfig.DefaultGiveCCItemKey;
+            Action reset = () => {
+                this.Config.GiveCCItemKey = ModConfig.DefaultGiveCCItemKey;
+                this.Config.Joja = ModConfig.DefaultJoja; 
+            };
             Action save = () => this.Helper.WriteConfig(Config);
 
             configMenu.Register(this.ModManifest, reset, save);
@@ -106,9 +109,13 @@ namespace Instant_Community_Center_Cheat
                     setValue: value => this.Config.GiveCCItemKey = value
                 );
 
-            //todo make it so the the joja check is a boolean through the mod config
-
-
+            configMenu.AddBoolOption(
+                mod: this.ModManifest,
+                name: () => "Joja Route",
+                tooltip: () => "If the player would like to complete the CC with Joja and get money instead of items",
+                getValue: () => this.Config.Joja,
+                setValue: value => this.Config.Joja = value
+                );
 
         }
 
@@ -130,7 +137,7 @@ namespace Instant_Community_Center_Cheat
                 if (PlayerSeenCommunityCenterCutscene())
                 {
                     //if (this.Config.Joja)
-                    if (true)
+                    if (Config.Joja)
                     {
                         GetJoja();
                     }
@@ -196,6 +203,7 @@ namespace Instant_Community_Center_Cheat
         /// </summary>
         private void GetItems()
         {
+            //todo make a check that the player didn't finish the CC normally
             if(BoughtJojaMembership())
             {
                 LogTrace("Cannot give player items as they bought the Joja membership");

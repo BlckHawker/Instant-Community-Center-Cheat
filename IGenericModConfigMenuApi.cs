@@ -29,6 +29,7 @@ namespace GenericModConfigMenu
         ****/
         void AddKeybind(IManifest mod, Func<SButton> getValue, Action<SButton> setValue, Func<string> name, Func<string> tooltip = null, string fieldId = null);
 
+        void AddBoolOption(IManifest mod, Func<bool> getValue, Action<bool> setValue, Func<string> name, Func<string> tooltip = null, string fieldId = null);
         /// <summary>Remove a mod from the config UI and delete all its options and pages.</summary>
         /// <param name="mod">The mod's manifest.</param>
         void Unregister(IManifest mod);
