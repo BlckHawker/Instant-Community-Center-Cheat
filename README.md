@@ -7,7 +7,9 @@
 
 
 ### How to use
-Press `L` (configurable with [Generic Mod Config Menu](https://www.nexusmods.com/stardewvalley/mods/5098)) to fill all of your inventory spaces get the items needed to complete the Community Center. It will also give the player enough money to complete the Vault.
+Press `L` (configurable with [Generic Mod Config Menu](https://www.nexusmods.com/stardewvalley/mods/5098)) to fill all of your inventory spaces get the items needed to complete the Community Center. It will also give the player enough money to complete the Vault. 
+
+You can also chooes to do the Joja route (also configurable with [Generic Mod Config Menu](https://www.nexusmods.com/stardewvalley/mods/5098)) which will give you enough money for the membership and the upgrades by pressing `L`.
 
 ### Compatibility
 - Works with Stardew Valley 1.6.15 and SMAPI 4.1.10.0 on Windows
