@@ -26,7 +26,7 @@ namespace Instant_Community_Center_Cheat
 
 
         //key is the area id in the CC
-        //the value is the list of ids corresponding the the bundles within that area
+        //value is the list of ids corresponding the the bundles within that area
         private Dictionary<int, int[]> areaBundles;
 
         //lewis unlocking the community center
@@ -37,6 +37,9 @@ namespace Instant_Community_Center_Cheat
 
         //player goes to wizard tower to read jumino text
         private const string wizard_jumino_event_id = "canReadJunimoText";
+
+        //id to check if the player is has bought the joja mbember
+        private const string joja_member = "JojaMember";
 
         /// <summary>The mod configuration.</summary>
         public ModConfig Config { get; set; }
@@ -410,7 +413,11 @@ namespace Instant_Community_Center_Cheat
         /// </summary>
         private void GetJoja()
         {
-
+            if (CommunityCenter.areAllAreasComplete())
+            {
+                Game1.showGlobalMessage("Can't do Joja Route. CC was complete via normal route");
+                return;
+            }
             //key - id of the upgrade
             //value - the amount of money needed for the upgrade
             Dictionary<string, int> jojaUpgrades = new Dictionary<string, int>()
@@ -436,7 +443,7 @@ namespace Instant_Community_Center_Cheat
                 }
 
                 //the player has the joja memeber ship, and needs to go to bed in order to get the mail
-                else if (BoughtJojaMembership() && !Game1.MasterPlayer.mailReceived.Contains("JojaMember"))
+                else if (BoughtJojaMembership() && !Game1.MasterPlayer.mailReceived.Contains(joja_member))
                 {
                     LogTrace("The player has the joja memeber ship, and needs to go to bed in order to get the mail");
                     popUpText = "Go to bed";
@@ -574,7 +581,7 @@ namespace Instant_Community_Center_Cheat
 
         private bool BoughtJojaMembership()
         {
-            return Game1.MasterPlayer.hasOrWillReceiveMail("JojaMember");
+            return Game1.MasterPlayer.hasOrWillReceiveMail(joja_member);
         }
 
         /// <summary>
