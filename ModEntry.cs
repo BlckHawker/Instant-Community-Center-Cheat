@@ -19,7 +19,7 @@ namespace Instant_Community_Center_Cheat
     internal sealed class ModEntry : Mod
     {
         private CommunityCenter? communityCenter;
-        private CommunityCenter CommunityCenter => communityCenter ??= (CommunityCenter)Game1.getLocationFromName("CommunityCenter");
+        private CommunityCenter CommunityCenter => communityCenter ??= GetCommunityCenter();
 
         private Town? town;
         private Town Town => town ??= (Town)Game1.locations.First(l => l is Town);
@@ -122,6 +122,19 @@ namespace Instant_Community_Center_Cheat
 
         }
 
+        /// <summary>
+        /// Raised after loading a save (including the first day after creating a new save), or connecting to a multiplayer world.
+        /// This happens right before DayStarted; at this point the save file is read and Context.IsWorldReady is true.
+        /// </summary>
+        /// <param name="sender">The event sender.</param>
+        /// <param name="e">The event data.</param>
+        private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
+        {
+            //get the instance of the community center from this save
+            communityCenter = GetCommunityCenter();
+            Log("Community center ovrwritten");
+        }
+
         /// <summary>Raised after the player presses a button on the keyboard, controller, or mouse.</summary>
         /// <param name="sender">The event sender.</param>
         /// <param name="e">The event data.</param>
@@ -139,7 +152,6 @@ namespace Instant_Community_Center_Cheat
 
                 if (PlayerSeenCommunityCenterCutscene())
                 {
-                    //if (this.Config.Joja)
                     if (Config.Joja)
                     {
                         GetJoja();
@@ -151,6 +163,15 @@ namespace Instant_Community_Center_Cheat
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Gets the instance of the Community Center in the world
+        /// </summary>
+        /// <returns>instance of the Community Center</returns>
+        private CommunityCenter GetCommunityCenter()
+        {
+            return (CommunityCenter)Game1.getLocationFromName("CommunityCenter");
         }
 
         private bool PlayerSeenCommunityCenterCutscene()
