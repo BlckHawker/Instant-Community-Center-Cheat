@@ -11,10 +11,6 @@ using StardewModdingAPI.Utilities;
 
 namespace Instant_Community_Center_Cheat
 {
-    //todo verify the check for when the CC is complete is valid
-    //todo make it so the button to trigger the code is customizable
-    //todo make a configurable thing where the items auttomatically get added to the correct slots
-    //todo make this mod compatible with the remixed versions
     /// <summary>The mod entry point.</summary>
     internal sealed class ModEntry : Mod
     {
@@ -23,6 +19,9 @@ namespace Instant_Community_Center_Cheat
 
         private Town? town;
         private Town Town => town ??= (Town)Game1.locations.First(l => l is Town);
+
+        //Flag to check if the player already has triggered skipping to a complate CC
+        private bool skipFlag = false;
 
 
         //key is the area id in the CC
@@ -80,6 +79,7 @@ namespace Instant_Community_Center_Cheat
 
             helper.Events.Input.ButtonPressed += this.OnButtonPressed;
             helper.Events.GameLoop.GameLaunched += this.OnGameLaunched;
+            helper.Events.GameLoop.SaveLoaded += OnSavedLoaded;
         }
 
 
@@ -146,7 +146,7 @@ namespace Instant_Community_Center_Cheat
             {
                 LogTrace($"Received get items key ({this.Config.GiveCCItemKey.ToString()})");
 
-                if (PlayerSeenCommunityCenterCutscene())
+                if (PlayerSeenCommunityCenterUnlockCutscene())
                 {
                     //if (this.Config.Joja)
                     if (Config.Joja)
@@ -162,7 +162,13 @@ namespace Instant_Community_Center_Cheat
             }
         }
 
-        private bool PlayerSeenCommunityCenterCutscene()
+        private void OnSavedLoaded(object? sender, SaveLoadedEventArgs e)
+        { 
+            //reset the skip flag
+            skipFlag = false;
+        }
+
+        private bool PlayerSeenCommunityCenterUnlockCutscene()
         {
             bool cutsceneSeen = Utility.HasAnyPlayerSeenEvent(community_center_unlocked_event_id);
             //the player has not watched the CC cutscene with Lewis
@@ -215,7 +221,7 @@ namespace Instant_Community_Center_Cheat
         /// </summary>
         private void GetItems()
         {
-            //todo make a check that the player didn't finish the CC normally
+            //Check if the player alreawdy bough the joja membership, meaning this path is locked
             if(BoughtJojaMembership())
             {
                 LogTrace("Cannot give player items as they bought the Joja membership");
@@ -268,154 +274,173 @@ namespace Instant_Community_Center_Cheat
                 }
 
                 //Otherwise, if the community center isn't complete,
-
-                //todo: if SkipGivingItem is true, make the flags for the CC areas true that are currentley false
-                if (Config.SkipGivingItem)
+                if (!CommunityCenter.areAllAreasComplete())
                 {
-                    Game1.showGlobalMessage("Skip giving items");
-
-                }
-
-                else if (!CommunityCenter.areAllAreasComplete())
-                {
-                    //Get all the bundles that are not complete
-                    //priortize the bundles that are currently avaible to the player (where the plaque is visuble)
-                    //ignore the abandanoned joja
-                    List<BundleModel> incompleteBundles = GetBundles(this.Monitor).Where(b => !CommunityCenter.isBundleComplete(b.ID) && !areaBundles[CommunityCenter.AREA_AbandonedJojaMart].Contains(b.ID))
-                                                         .OrderByDescending(b => BundleAvaiable(b.ID)).ToList();
-
-                    //In the list of incomplete bundles, check which items have been donated or not
-                    List<BundleIngredientModel> requiredIngredients = new List<BundleIngredientModel>();
-                    foreach (BundleModel incompleteBundle in incompleteBundles)
+                    //if SkipGivingItem is true, make the flags for the CC areas true
+                    if (Config.SkipGivingItem)
                     {
-                        BundleIngredientModel[] allIngredients = incompleteBundle.Ingredients;
-                        //get the slots needed for an bundle to be completed
-                        int bundleSlots = incompleteBundle.Slots;
-                        requiredIngredients.AddRange(allIngredients.Where(i => IsIngredientNeeded(incompleteBundle, i)).Take(bundleSlots));
-                    }
-
-                    //get all of the items the player to complete the Comunity Center.
-                    List<Item> missingItems = requiredIngredients.Select(item => ItemRegistry.Create(item.ItemId, item.Stack, (int)item.Quality)).ToList();
-
-                    //if there are any intances of items that have the same name and quality, combine them
-                    for (int i = missingItems.Count - 1; i > 0; i--)
-                    {
-                        Item targetItem = missingItems[i];
-
-                        List<Item> duplicateItems = missingItems.Where(item => item.Name == targetItem.Name && item.Quality == targetItem.Quality).ToList();
-
-
-                        //if more than one item was found, combine all instances into one item and delete the others from the list
-                        if (duplicateItems.Count > 1)
+                        string text;
+                        if (!skipFlag)
                         {
-                            int itemCount = duplicateItems.Sum(item => item.Stack);
-                            Item newItem = ItemRegistry.Create(targetItem.ItemId, itemCount, targetItem.Quality);
-
-                            foreach (Item duplicateItem in duplicateItems)
-                            {
-                                missingItems.Remove(duplicateItem);
-                            }
-
-                            missingItems.Add(newItem);
+                            skipFlag = true;
+                            text = "Setting the Community Center as complete";
                         }
+
+                        //todo add a check if the player has already seen the CC complete cutscene, if they have not, tell them to go to bed and go the the Town
+
+                        else
+                        {
+                            text = "Community Center is complete, no need to skip items";
+                        }
+
+                        Game1.showGlobalMessage(text);
+                        LogTrace(text);
                     }
 
-                    Log($"Missing item names: {Join(missingItems.Select(i => $"{i.Stack} {(ItemQuality)i.Quality} {i.Name}"))}");
-
-                    Inventory playerItems = Game1.player.Items;
-
-                    //all the items added to player's inventory
-                    List<Item> addedItems = new List<Item>();
-
-
-                    LogTrace("Adding items to player's inventory...");
-                    // For each item in that list:
-                    foreach (Item item in missingItems)
+                    //Otherwise, give the player the items / money needed to complete the CC
+                    else
                     {
-                        LogTrace($"Attempting to add {item.Stack} {(ItemQuality)item.Quality} {item.DisplayName}...");
-                        //if the the item was found within the player's inventory
-                        bool foundItem = false;
+                        //Get all the bundles that are not complete
+                        //priortize the bundles that are currently avaible to the player (where the plaque is visuble)
+                        //ignore the abandanoned joja
+                        List<BundleModel> incompleteBundles = GetBundles(this.Monitor).Where(b => !CommunityCenter.isBundleComplete(b.ID) && !areaBundles[CommunityCenter.AREA_AbandonedJojaMart].Contains(b.ID))
+                                                             .OrderByDescending(b => BundleAvaiable(b.ID)).ToList();
 
-                        for (int i = 0; i < playerItems.Count; i++)
+                        //In the list of incomplete bundles, check which items have been donated or not
+                        List<BundleIngredientModel> requiredIngredients = new List<BundleIngredientModel>();
+                        foreach (BundleModel incompleteBundle in incompleteBundles)
                         {
-                            Item? playerItem = playerItems[i];
+                            BundleIngredientModel[] allIngredients = incompleteBundle.Ingredients;
+                            //get the slots needed for an bundle to be completed
+                            int bundleSlots = incompleteBundle.Slots;
+                            requiredIngredients.AddRange(allIngredients.Where(i => IsIngredientNeeded(incompleteBundle, i)).Take(bundleSlots));
+                        }
 
-                            if (playerItem == null)
-                            {
-                                continue;
-                            }
+                        //get all of the items the player to complete the Comunity Center.
+                        List<Item> missingItems = requiredIngredients.Select(item => ItemRegistry.Create(item.ItemId, item.Stack, (int)item.Quality)).ToList();
 
-                            bool sameId = playerItem.QualifiedItemId == item.QualifiedItemId;
-                            bool validQuality = playerItem.quality.Value >= item.quality.Value;
-                            bool enoughStack = playerItem.Stack >= item.Stack;
+                        //if there are any intances of items that have the same name and quality, combine them
+                        for (int i = missingItems.Count - 1; i > 0; i--)
+                        {
+                            Item targetItem = missingItems[i];
 
-                            // If the player has the item (of the same required quality or higher) and has at least the necessary stack requirement, move on to the next item
-                            if (sameId && validQuality && enoughStack)
+                            List<Item> duplicateItems = missingItems.Where(item => item.Name == targetItem.Name && item.Quality == targetItem.Quality).ToList();
+
+
+                            //if more than one item was found, combine all instances into one item and delete the others from the list
+                            if (duplicateItems.Count > 1)
                             {
-                                foundItem = true;
-                                LogTrace("The player already has enough of this item in their inventory");
-                                break;
-                            }
-                            // If the player has the item (of the same required quality or higher) and doesn't have the stack requirment, add the missing number to that stack
-                            else if (sameId && validQuality)
-                            {
-                                int missingCount = Math.Abs(playerItem.Stack - item.Stack);
-                                playerItem.Stack += missingCount;
-                                foundItem = true;
-                                addedItems.Add(ItemRegistry.Create(item.QualifiedItemId, missingCount, item.Quality));
-                                LogTrace($"The player already has {item.Stack} of this item in their inventory. Added {missingCount} more");
-                                break;
+                                int itemCount = duplicateItems.Sum(item => item.Stack);
+                                Item newItem = ItemRegistry.Create(targetItem.ItemId, itemCount, targetItem.Quality);
+
+                                foreach (Item duplicateItem in duplicateItems)
+                                {
+                                    missingItems.Remove(duplicateItem);
+                                }
+
+                                missingItems.Add(newItem);
                             }
                         }
 
-                        // If the player does not have this item in their inventory, and they have room for the item to be there,
-                        // add the item with the correct stack quantity
-                        if (!foundItem && playerItems.HasEmptySlots())
+                        Log($"Missing item names: {Join(missingItems.Select(i => $"{i.Stack} {(ItemQuality)i.Quality} {i.Name}"))}");
+
+                        Inventory playerItems = Game1.player.Items;
+
+                        //all the items added to player's inventory
+                        List<Item> addedItems = new List<Item>();
+
+
+                        LogTrace("Adding items to player's inventory...");
+                        // For each item in that list:
+                        foreach (Item item in missingItems)
                         {
-                            Game1.player.addItemsByMenuIfNecessary(new List<Item> { item });
-                            addedItems.Add(ItemRegistry.Create(item.QualifiedItemId, item.Stack, item.Quality));
-                            LogTrace($"Added the item to the player's inventory");
+                            LogTrace($"Attempting to add {item.Stack} {(ItemQuality)item.Quality} {item.DisplayName}...");
+                            //if the the item was found within the player's inventory
+                            bool foundItem = false;
+
+                            for (int i = 0; i < playerItems.Count; i++)
+                            {
+                                Item? playerItem = playerItems[i];
+
+                                if (playerItem == null)
+                                {
+                                    continue;
+                                }
+
+                                bool sameId = playerItem.QualifiedItemId == item.QualifiedItemId;
+                                bool validQuality = playerItem.quality.Value >= item.quality.Value;
+                                bool enoughStack = playerItem.Stack >= item.Stack;
+
+                                // If the player has the item (of the same required quality or higher) and has at least the necessary stack requirement, move on to the next item
+                                if (sameId && validQuality && enoughStack)
+                                {
+                                    foundItem = true;
+                                    LogTrace("The player already has enough of this item in their inventory");
+                                    break;
+                                }
+                                // If the player has the item (of the same required quality or higher) and doesn't have the stack requirment, add the missing number to that stack
+                                else if (sameId && validQuality)
+                                {
+                                    int missingCount = Math.Abs(playerItem.Stack - item.Stack);
+                                    playerItem.Stack += missingCount;
+                                    foundItem = true;
+                                    addedItems.Add(ItemRegistry.Create(item.QualifiedItemId, missingCount, item.Quality));
+                                    LogTrace($"The player already has {item.Stack} of this item in their inventory. Added {missingCount} more");
+                                    break;
+                                }
+                            }
+
+                            // If the player does not have this item in their inventory, and they have room for the item to be there,
+                            // add the item with the correct stack quantity
+                            if (!foundItem && playerItems.HasEmptySlots())
+                            {
+                                Game1.player.addItemsByMenuIfNecessary(new List<Item> { item });
+                                addedItems.Add(ItemRegistry.Create(item.QualifiedItemId, item.Stack, item.Quality));
+                                LogTrace($"Added the item to the player's inventory");
+                            }
+
+                            else
+                            {
+                                LogTrace($"The player doesn't have enough space in their invetory to add this item");
+                            }
+                        }
+
+                        //When all items are given, send a message to say which items were added
+                        Game1.showGlobalMessage("Added items to inventory");
+                        LogTrace("Finished adding items to player's inventory");
+
+                        //Check if there are any money bundles
+                        LogTrace("Checking if the player needs money...");
+
+                        //Note: this is a bug where all of these ids are always considered incomplete (even when the vault area is considered complete)
+                        List<bool> bundlesComplete = areaBundles[CommunityCenter.AREA_Vault].Select(id => CommunityCenter.isBundleComplete(id)).ToList();
+                        Log($"Vault bundle ids: {Join(areaBundles[CommunityCenter.AREA_Vault])}");
+                        Log($"Complete money bundles {Join(bundlesComplete)}");
+                        Log($"Vault complete: {Game1.player.hasOrWillReceiveMail("ccVault").ToString()}");
+                        List<int> moneyBundles = areaBundles[CommunityCenter.AREA_Vault].Where(id => !CommunityCenter.isBundleComplete(id)).Select(id => GetBundleMoneyValue(id)).ToList();
+
+                        if (moneyBundles.Count > 0)
+                        {
+                            LogTrace($"Player needs to donate to the following bundles: {Join(moneyBundles)}");
+                            GiveRequiredMoney(moneyBundles.Sum());
+
                         }
 
                         else
                         {
-                            LogTrace($"The player doesn't have enough space in their invetory to add this item");
+                            LogTrace("The player doesn't need to donate any money");
                         }
-                    }
-
-                    //When all items are given, send a message to say which items were added
-                    Game1.showGlobalMessage("Added items to inventory");
-                    LogTrace("Finished adding items to player's inventory");
-
-                    //Check if there are any money bundles
-                    LogTrace("Checking if the player needs money...");
-
-                    //Note: this is a bug where all of these ids are always considered incomplete (even when the vault area is considered complete)
-                    List<bool> bundlesComplete = areaBundles[CommunityCenter.AREA_Vault].Select(id => CommunityCenter.isBundleComplete(id)).ToList();
-                    Log($"Vault bundle ids: {Join(areaBundles[CommunityCenter.AREA_Vault])}");
-                    Log($"Complete money bundles {Join(bundlesComplete)}");
-                    Log($"Vault complete: {Game1.player.hasOrWillReceiveMail("ccVault").ToString()}");
-                    List<int> moneyBundles = areaBundles[CommunityCenter.AREA_Vault].Where(id => !CommunityCenter.isBundleComplete(id)).Select(id => GetBundleMoneyValue(id)).ToList();
-
-                    if (moneyBundles.Count > 0)
-                    {
-                        LogTrace($"Player needs to donate to the following bundles: {Join(moneyBundles)}");
-                        GiveRequiredMoney(moneyBundles.Sum());
 
                     }
-
-                    else
-                    {
-                        LogTrace("The player doesn't need to donate any money");
-                    }
-
                 }
 
                 else
                 {
+                    string text = $"Community Center is complete, no {(Config.SkipGivingItem ? "need to skip items" : "items to add")}";
+
                     //If the community center is complete, send a message saying nothing else can be done with this mod
-                    Game1.showGlobalMessage("Community Center is complete, no items to add");
-                    LogTrace("Community Center is complete, no items to add");
+                    Game1.showGlobalMessage(text);
+                    LogTrace(text);
                 }
             }
 
@@ -446,7 +471,6 @@ namespace Instant_Community_Center_Cheat
                 { "jojaFishTank", 20000 }
             };
 
-            //todo make a check if the player has the membership card
             string popUpText = "";
 
             if (!Utility.hasFinishedJojaRoute())
@@ -466,7 +490,7 @@ namespace Instant_Community_Center_Cheat
                     popUpText = "Go to bed";
                 }
 
-                //todo if there is an upgrade in progress, tell the player to go to bed
+                //if there is an upgrade in progress, tell the player to go to bed
                 else if (jojaUpgrades.Keys.Any(id => Game1.player.mailForTomorrow.Contains(id + "%&NL&%")))
                 {
                     LogTrace("There is an upgrade in progress and the player needs to go to bed for it to finish");
