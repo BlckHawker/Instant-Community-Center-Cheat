@@ -99,6 +99,7 @@ namespace Instant_Community_Center_Cheat
             Action reset = () => {
                 this.Config.GiveCCItemKey = ModConfig.DefaultGiveCCItemKey;
                 this.Config.Joja = ModConfig.DefaultJoja; 
+                this.Config.SkipGivingItem = ModConfig.DefaultSkipGivingItems;
             };
             Action save = () => this.Helper.WriteConfig(Config);
 
@@ -110,6 +111,14 @@ namespace Instant_Community_Center_Cheat
                     tooltip: () => "The key to press to get all the items to complete the Community Center",
                     getValue: () => this.Config.GiveCCItemKey,
                     setValue: value => this.Config.GiveCCItemKey = value
+                );
+
+            configMenu.AddBoolOption(
+                mod: this.ModManifest,
+                name: () => "Skip Giving Item",
+                tooltip: () => "If the player wants to complete the CC the normal way without needing to donate items",
+                getValue: () => this.Config.SkipGivingItem,
+                setValue: value => this.Config.SkipGivingItem = value
                 );
 
             configMenu.AddBoolOption(
@@ -259,7 +268,15 @@ namespace Instant_Community_Center_Cheat
                 }
 
                 //Otherwise, if the community center isn't complete,
-                if (!CommunityCenter.areAllAreasComplete())
+
+                //todo: if SkipGivingItem is true, make the flags for the CC areas true that are currentley false
+                if (Config.SkipGivingItem)
+                {
+                    Game1.showGlobalMessage("Skip giving items");
+
+                }
+
+                else if (!CommunityCenter.areAllAreasComplete())
                 {
                     //Get all the bundles that are not complete
                     //priortize the bundles that are currently avaible to the player (where the plaque is visuble)
@@ -361,7 +378,7 @@ namespace Instant_Community_Center_Cheat
                         }
 
                         else
-                        { 
+                        {
                             LogTrace($"The player doesn't have enough space in their invetory to add this item");
                         }
                     }
@@ -378,7 +395,7 @@ namespace Instant_Community_Center_Cheat
                     Log($"Vault bundle ids: {Join(areaBundles[CommunityCenter.AREA_Vault])}");
                     Log($"Complete money bundles {Join(bundlesComplete)}");
                     Log($"Vault complete: {Game1.player.hasOrWillReceiveMail("ccVault").ToString()}");
-                    List<int> moneyBundles =  areaBundles[CommunityCenter.AREA_Vault].Where(id => !CommunityCenter.isBundleComplete(id)).Select(id => GetBundleMoneyValue(id)).ToList();
+                    List<int> moneyBundles = areaBundles[CommunityCenter.AREA_Vault].Where(id => !CommunityCenter.isBundleComplete(id)).Select(id => GetBundleMoneyValue(id)).ToList();
 
                     if (moneyBundles.Count > 0)
                     {
@@ -395,7 +412,7 @@ namespace Instant_Community_Center_Cheat
                 }
 
                 else
-                { 
+                {
                     //If the community center is complete, send a message saying nothing else can be done with this mod
                     Game1.showGlobalMessage("Community Center is complete, no items to add");
                     LogTrace("Community Center is complete, no items to add");
