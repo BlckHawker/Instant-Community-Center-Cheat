@@ -24,7 +24,7 @@ You can also chooes to do the Joja route (also configurable with [Generic Mod Co
 - Change hotkey to be a console command
 
 ### See also
-- Discord username: `blckhawker`
-    - Message me if you need support with the mod. Please don't spam as I am a solo developer
+- [Discord server](https://discord.gg/kdhq6gfPxS)
+    - Hub for all of my Stardew mods. Can report bugs or request features here.
 - [Releases](https://github.com/BlckHawker/Instant-Community-Center-Cheat/releases)
 - [Source code](https://github.com/BlckHawker/Instant-Community-Center-Cheat)
